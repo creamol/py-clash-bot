@@ -1,10 +1,6 @@
-import os
 import random
 import time
-from os.path import abspath, dirname, join
 from typing import Literal
-
-import cv2
 
 from pyclashbot.bot.constants import CLASH_MAIN_DEADSPACE_COORD as CLASH_MAIN_MENU_DEADSPACE_COORD
 from pyclashbot.bot.tencent_nav import handle_tencent_popups
@@ -1064,52 +1060,10 @@ _CHINESE_POST_BATTLE_OK_COORDS = [
     (210, 570),  # near bottom edge
 ]
 
-_QUEDING_TEMPLATE_DIR = abspath(join(dirname(__file__), "..", "detection", "reference_images", "tencent_queding"))
-_DEBUG_SCREENSHOT_DIR = abspath(join(dirname(__file__), "..", "..", "debug_screenshots"))
-
-
-def _auto_capture_queding_template(screenshot) -> None:
-    """When template matching fails, crop the expected 确定 button region from the real
-    screenshot and save it as a new reference image. This lets the bot self-update its
-    templates from actual game captures without manual intervention.
-
-    The crop covers a generous area around the known button centre (210, 588) so that
-    minor position shifts are still captured.
-    """
-    try:
-        h, w = screenshot.shape[:2]
-
-        # Crop: text-only area so top-left of match lands inside button (verified from live screenshot)
-        x1, x2 = max(0, 176), min(w, 244)
-        y1, y2 = max(0, 545), min(h, 565)
-        crop = screenshot[y1:y2, x1:x2]
-
-        if crop.size == 0:
-            return
-
-        # Save to reference images folder with the next available number
-        existing = [f for f in os.listdir(_QUEDING_TEMPLATE_DIR) if f.endswith(".png")]
-        next_num = len(existing) + 1
-        out_path = join(_QUEDING_TEMPLATE_DIR, f"{next_num}.png")
-        cv2.imwrite(out_path, crop)
-        print(f"[queding] Saved new template from live screenshot → {out_path}")
-
-        # Also save the full screenshot to debug_screenshots/ for review
-        os.makedirs(_DEBUG_SCREENSHOT_DIR, exist_ok=True)
-        ts = int(time.time())
-        full_path = join(_DEBUG_SCREENSHOT_DIR, f"queding_full_{ts}.png")
-        cv2.imwrite(full_path, screenshot)
-        print(f"[queding] Full debug screenshot → {full_path}")
-
-    except Exception as exc:
-        print(f"[queding] auto-capture failed: {exc}")
-
-
 def get_to_main_after_fight(emulator, logger):
     timeout = 120  # s
     start_time = time.time()
     clicked_ok_or_exit = False
-    captured_template = False  # only auto-capture once per call
     is_chinese = getattr(emulator, "clash_package", None) == CHINESE_CLASH_PACKAGE
 
     logger.change_status("Returning to clash main after the fight...")
@@ -1132,21 +1086,12 @@ def get_to_main_after_fight(emulator, logger):
             interruptible_sleep(3)
             continue
 
-        # Try Tencent popup handler (template matching at lower tolerance)
         if handle_tencent_popups(emulator):
             interruptible_sleep(1)
             continue
 
-        # Chinese package: template matching failed — capture a real screenshot so we
-        # can build an accurate template, then try hardcoded coordinates.
         if is_chinese:
-            screenshot = emulator.screenshot()
-            if not captured_template and screenshot is not None:
-                _auto_capture_queding_template(screenshot)
-                captured_template = True
-
             for coord in _CHINESE_POST_BATTLE_OK_COORDS:
-                print(f"[Chinese 确定] Trying at {coord}")
                 emulator.click(coord[0], coord[1])
                 interruptible_sleep(0.4)
             interruptible_sleep(0.6)
@@ -1160,7 +1105,6 @@ def get_to_main_after_fight(emulator, logger):
             continue
 
         interruptible_sleep(1)
-        print("Clicking on deadspace to close potential pop-up windows.")
         emulator.click(CLASH_MAIN_MENU_DEADSPACE_COORD[0], CLASH_MAIN_MENU_DEADSPACE_COORD[1])
 
     return False
