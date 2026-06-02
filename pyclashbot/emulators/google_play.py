@@ -8,6 +8,7 @@ from os.path import normpath
 import psutil
 
 from pyclashbot.bot.nav import check_if_on_clash_main_menu
+from pyclashbot.bot.tencent_nav import handle_tencent_popups
 from pyclashbot.emulators.adb_base import AdbBasedController
 from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE
 from pyclashbot.utils.cancellation import interruptible_sleep
@@ -435,7 +436,8 @@ class GooglePlayEmulatorController(AdbBasedController):
                 self.logger.log("Detected clash main!")
                 break
 
-            # click deadspace
+            # Dismiss Tencent popups then click deadspace
+            handle_tencent_popups(self)
             self.click(35, 405)
 
         restart_duration = str(time.time() - restart_start_time)[:5]

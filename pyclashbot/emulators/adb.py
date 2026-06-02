@@ -5,6 +5,7 @@ import time
 
 # Assuming these are in the correct path
 from pyclashbot.bot.nav import check_if_on_clash_main_menu
+from pyclashbot.bot.tencent_nav import handle_tencent_popups
 from pyclashbot.emulators.adb_base import AdbBasedController
 from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE
 from pyclashbot.utils.cancellation import interruptible_sleep
@@ -342,20 +343,20 @@ class AdbController(AdbBasedController):
 
     ## Implemented Methods ##
 
-    def restart(self) -> bool:
+    def restart(self, _attempt: int = 1) -> bool:
         """
         Restarts the Clash Royale app to ensure a clean state.
-        This method will:
-        1. Force-stop the app.
-        2. Start the app (using the base class method).
-        3. Wait for the main menu to appear.
+        Retries up to 3 times if the main menu is not reached within the timeout.
         Returns:
             bool: True if the app was successfully restarted and the main menu is found, False otherwise.
         """
+        max_attempts = 3
         start_ts = time.time()
-        self.logger.change_status("Restarting Clash Royale on device...")
-
         clash_pkg = self.clash_package
+
+        self.logger.change_status(
+            f"Restarting Clash Royale on device... (attempt {_attempt}/{max_attempts})"
+        )
 
         # 1. Force stop the app
         self.logger.change_status(f"Force-stopping {clash_pkg}...")
@@ -365,8 +366,6 @@ class AdbController(AdbBasedController):
         # 2. Start the app using the inherited method
         self.logger.change_status("Launching Clash Royale...")
         if not self.start_app(clash_pkg):
-            # This means the app isn't installed and the user is being prompted.
-            # We can't proceed with the restart.
             self.logger.log("App not installed. Restart cannot complete.")
             return False
 
@@ -382,9 +381,17 @@ class AdbController(AdbBasedController):
                 self.logger.log(f"App restart completed in {dur}")
                 return True
 
-            # Click in a safe area to dismiss potential pop-ups
+            # Dismiss Tencent popups then click deadspace
+            handle_tencent_popups(self)
             self.click(35, 405)
             interruptible_sleep(2)
+
+        # Timeout — retry if attempts remain
+        if _attempt < max_attempts:
+            self.logger.change_status(
+                f"Timeout waiting for main menu (attempt {_attempt}/{max_attempts}). Retrying..."
+            )
+            return self.restart(_attempt=_attempt + 1)
 
         self.logger.change_status("Timeout waiting for Clash Royale main menu. Please check the device.")
         return False

@@ -125,9 +125,10 @@ def compare_images(
     # Get the best match location
     _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(res)
 
-    # Return best match if it exceeds threshold
+    # Return center of matched region so callers can click directly without offset math
     if max_val >= threshold:
-        return [int(max_loc[1]), int(max_loc[0])]  # [y, x]
+        th, tw = template_gray.shape[:2]
+        return [int(max_loc[1]) + th // 2, int(max_loc[0]) + tw // 2]  # [y, x] center
 
     return None
 

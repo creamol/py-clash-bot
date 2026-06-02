@@ -17,8 +17,9 @@ Buttons handled
 from pyclashbot.detection.image_rec import find_image
 from pyclashbot.emulators.base import CHINESE_CLASH_PACKAGE
 
-# Tolerance values tuned for the reference images supplied
-_TOLERANCE_QUEDING = 0.85
+# Tolerance values tuned for the reference images supplied.
+# Queding uses a lower value so older/slightly-different reference images still match.
+_TOLERANCE_QUEDING = 0.72
 _TOLERANCE_GUANBI = 0.85
 _TOLERANCE_LINGQUAN = 0.85
 

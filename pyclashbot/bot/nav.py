@@ -1,6 +1,10 @@
+import os
 import random
 import time
+from os.path import abspath, dirname, join
 from typing import Literal
+
+import cv2
 
 from pyclashbot.bot.constants import CLASH_MAIN_DEADSPACE_COORD as CLASH_MAIN_MENU_DEADSPACE_COORD
 from pyclashbot.bot.tencent_nav import handle_tencent_popups
@@ -466,6 +470,36 @@ def return_to_clash_main_from_card_page(emulator, logger: Logger) -> bool:
     return True
 
 
+def _print_options_menu_debug_pixels(emulator):
+    """Print BGR pixel values at options menu detection positions for diagnosing Chinese version color mismatches."""
+    try:
+        iar = emulator.screenshot()
+        if iar is None:
+            return
+        positions = [(42, 256), (41, 275), (41, 282), (42, 293), (44, 325), (32, 239), (34, 336), (50, 248), (49, 336)]
+        print("[options_menu debug] BGR pixel values at detection positions:")
+        for y, x in positions:
+            pixel = iar[y][x].tolist()
+            print(f"  iar[{y}][{x}] = {pixel}")
+    except Exception as exc:
+        print(f"[options_menu debug] Failed to capture debug pixels: {exc}")
+
+
+def _print_battle_log_debug_pixels(emulator):
+    """Print BGR pixel values at battle log page detection positions for diagnosing Chinese version color mismatches."""
+    try:
+        iar = emulator.screenshot()
+        if iar is None:
+            return
+        positions = [(72, 160), (71, 187), (71, 197), (72, 231), (73, 258), (64, 366), (79, 365), (70, 365), (62, 92), (77, 316)]
+        print("[battle_log debug] BGR pixel values at detection positions:")
+        for y, x in positions:
+            pixel = iar[y][x].tolist()
+            print(f"  iar[{y}][{x}] = {pixel}")
+    except Exception as exc:
+        print(f"[battle_log debug] Failed to capture debug pixels: {exc}")
+
+
 def get_to_activity_log(
     emulator,
     logger: Logger,
@@ -566,11 +600,25 @@ def check_if_on_battle_log_page(emulator) -> bool:
         [138, 122, 115],
         [124, 106, 99],
     ]
+    # Chinese (Tencent) version — header text pixels 0-4 are brownish/dark instead of white
+    colors_chinese = [
+        [124, 106, 99],
+        [2, 2, 2],
+        [219, 216, 215],
+        [194, 188, 186],
+        [124, 106, 99],
+        [147, 135, 254],
+        [38, 38, 240],
+        [255, 255, 255],
+        [138, 122, 115],
+        [124, 106, 99],
+    ]
 
-    for i, p in enumerate(pixels):
-        if not pixel_is_equal(p, colors[i], tol=25):
-            return False
-    return True
+    if all(pixel_is_equal(pixels[i], colors[i], tol=25) for i in range(len(pixels))):
+        return True
+    if all(pixel_is_equal(pixels[i], colors_chinese[i], tol=25) for i in range(len(pixels))):
+        return True
+    return False
 
 
 def check_if_on_clash_main_burger_button_options_menu(emulator) -> bool:
@@ -597,10 +645,24 @@ def check_if_on_clash_main_burger_button_options_menu(emulator) -> bool:
         [255, 175, 78],
         [255, 175, 78],
     ]
-    for i, color in enumerate(colors):
-        if not pixel_is_equal(pixels[i], color, tol=25):
-            return False
-    return True
+    # Chinese (Tencent) version — orange header extends over positions 0 and 4,
+    # positions 1-3 are near-black/beige instead of white
+    colors_chinese = [
+        [255, 175, 78],
+        [6, 4, 2],
+        [219, 197, 171],
+        [254, 247, 238],
+        [255, 175, 78],
+        [255, 187, 105],
+        [255, 187, 105],
+        [255, 175, 78],
+        [255, 175, 78],
+    ]
+    if all(pixel_is_equal(pixels[i], colors[i], tol=25) for i in range(len(pixels))):
+        return True
+    if all(pixel_is_equal(pixels[i], colors_chinese[i], tol=25) for i in range(len(pixels))):
+        return True
+    return False
 
 
 def wait_for_clash_main_burger_button_options_menu(
@@ -993,22 +1055,61 @@ def find_post_battle_button(emulator):
 
 
 
-# Coordinates where the 确定 (OK) button appears on various Chinese CR post-battle screens.
-# Primary coord derived from screenshot: button sits at ~93% of screen height → y ≈ 588.
-# Ordered by most-common first; the loop tries each in turn.
+# Coordinates where the 确定 (OK) button appears on Chinese CR post-battle screens.
+# Verified from live screenshot: button spans y=548-573, centre at (210, 560).
 _CHINESE_POST_BATTLE_OK_COORDS = [
-    (210, 588),  # post-battle result screen (screenshot-verified)
-    (210, 600),  # slight lower variant
-    (210, 575),  # slight higher variant
-    (210, 545),  # other dialog positions
+    (210, 560),  # centre of button (screenshot-verified)
+    (210, 555),  # upper half (text area)
+    (210, 565),  # lower half
+    (210, 570),  # near bottom edge
 ]
+
+_QUEDING_TEMPLATE_DIR = abspath(join(dirname(__file__), "..", "detection", "reference_images", "tencent_queding"))
+_DEBUG_SCREENSHOT_DIR = abspath(join(dirname(__file__), "..", "..", "debug_screenshots"))
+
+
+def _auto_capture_queding_template(screenshot) -> None:
+    """When template matching fails, crop the expected 确定 button region from the real
+    screenshot and save it as a new reference image. This lets the bot self-update its
+    templates from actual game captures without manual intervention.
+
+    The crop covers a generous area around the known button centre (210, 588) so that
+    minor position shifts are still captured.
+    """
+    try:
+        h, w = screenshot.shape[:2]
+
+        # Crop: text-only area so top-left of match lands inside button (verified from live screenshot)
+        x1, x2 = max(0, 176), min(w, 244)
+        y1, y2 = max(0, 545), min(h, 565)
+        crop = screenshot[y1:y2, x1:x2]
+
+        if crop.size == 0:
+            return
+
+        # Save to reference images folder with the next available number
+        existing = [f for f in os.listdir(_QUEDING_TEMPLATE_DIR) if f.endswith(".png")]
+        next_num = len(existing) + 1
+        out_path = join(_QUEDING_TEMPLATE_DIR, f"{next_num}.png")
+        cv2.imwrite(out_path, crop)
+        print(f"[queding] Saved new template from live screenshot → {out_path}")
+
+        # Also save the full screenshot to debug_screenshots/ for review
+        os.makedirs(_DEBUG_SCREENSHOT_DIR, exist_ok=True)
+        ts = int(time.time())
+        full_path = join(_DEBUG_SCREENSHOT_DIR, f"queding_full_{ts}.png")
+        cv2.imwrite(full_path, screenshot)
+        print(f"[queding] Full debug screenshot → {full_path}")
+
+    except Exception as exc:
+        print(f"[queding] auto-capture failed: {exc}")
 
 
 def get_to_main_after_fight(emulator, logger):
     timeout = 120  # s
     start_time = time.time()
     clicked_ok_or_exit = False
-    failed_detection_streak = 0
+    captured_template = False  # only auto-capture once per call
     is_chinese = getattr(emulator, "clash_package", None) == CHINESE_CLASH_PACKAGE
 
     logger.change_status("Returning to clash main after the fight...")
@@ -1029,13 +1130,26 @@ def get_to_main_after_fight(emulator, logger):
             print("Found trophy reward menu!\nHandling Trophy Reward Menu")
             handle_trophy_reward_menu(emulator, logger, printmode=False)
             interruptible_sleep(3)
-            failed_detection_streak = 0
             continue
 
-        # dismiss any Tencent (Chinese edition) UI overlays
+        # Try Tencent popup handler (template matching at lower tolerance)
         if handle_tencent_popups(emulator):
             interruptible_sleep(1)
-            failed_detection_streak = 0
+            continue
+
+        # Chinese package: template matching failed — capture a real screenshot so we
+        # can build an accurate template, then try hardcoded coordinates.
+        if is_chinese:
+            screenshot = emulator.screenshot()
+            if not captured_template and screenshot is not None:
+                _auto_capture_queding_template(screenshot)
+                captured_template = True
+
+            for coord in _CHINESE_POST_BATTLE_OK_COORDS:
+                print(f"[Chinese 确定] Trying at {coord}")
+                emulator.click(coord[0], coord[1])
+                interruptible_sleep(0.4)
+            interruptible_sleep(0.6)
             continue
 
         button_coord = find_post_battle_button(emulator)
@@ -1043,20 +1157,6 @@ def get_to_main_after_fight(emulator, logger):
             print("Found post-battle button, clicking it.")
             emulator.click(button_coord[0], button_coord[1])
             clicked_ok_or_exit = True
-            failed_detection_streak = 0
-            continue
-
-        failed_detection_streak += 1
-
-        # For Chinese package, after a few failed detection rounds try clicking at
-        # known 确定 button positions directly (template matching may not cover every
-        # post-battle screen variant).
-        if is_chinese and failed_detection_streak % 4 == 0:
-            coord_index = (failed_detection_streak // 4 - 1) % len(_CHINESE_POST_BATTLE_OK_COORDS)
-            fallback_coord = _CHINESE_POST_BATTLE_OK_COORDS[coord_index]
-            print(f"[Chinese fallback] Trying 确定 at {fallback_coord}")
-            emulator.click(fallback_coord[0], fallback_coord[1])
-            interruptible_sleep(1)
             continue
 
         interruptible_sleep(1)

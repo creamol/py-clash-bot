@@ -15,6 +15,7 @@ import psutil
 from pymemuc import PyMemuc, PyMemucError, VMInfo
 
 from pyclashbot.bot.nav import check_if_on_clash_main_menu
+from pyclashbot.bot.tencent_nav import handle_tencent_popups
 from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE, BaseEmulatorController
 from pyclashbot.utils.cancellation import interruptible_sleep
 from pyclashbot.utils.platform import Platform
@@ -1353,7 +1354,8 @@ class MemuEmulatorController(BaseEmulatorController):
                     )
                     self.logger.log("[RESTART] Clicking deadspace at (5, 350) to handle popups...")
 
-                # Click deadspace to handle any popups
+                # Dismiss Tencent popups (确定 / 关闭 / 领取全部) then click deadspace
+                handle_tencent_popups(self)
                 click_start = time.time()
                 self.click(35, 405)
                 click_end = time.time()

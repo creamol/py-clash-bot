@@ -9,6 +9,7 @@ from contextlib import suppress
 from os.path import normpath
 
 from pyclashbot.bot.nav import check_if_on_clash_main_menu
+from pyclashbot.bot.tencent_nav import handle_tencent_popups
 from pyclashbot.emulators.adb_base import AdbBasedController
 from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE
 from pyclashbot.utils.cancellation import interruptible_sleep
@@ -635,9 +636,12 @@ class BlueStacksEmulatorController(AdbBasedController):
                 check=False,
             )
 
-    def restart(self) -> bool:
+    def restart(self, _attempt: int = 1) -> bool:
+        max_attempts = 3
         start_ts = time.time()
-        self.logger.change_status("Starting BlueStacks 5 emulator restart process...")
+        self.logger.change_status(
+            f"Starting BlueStacks 5 emulator restart process... (attempt {_attempt}/{max_attempts})"
+        )
 
         self.logger.change_status("Stopping pyclashbot BlueStacks 5 instance...")
         self.stop()
@@ -696,9 +700,16 @@ class BlueStacksEmulatorController(AdbBasedController):
                 dur = f"{time.time() - start_ts:.1f}s"
                 self.logger.log(f"BlueStacks 5 restart completed in {dur}")
                 return True
+            handle_tencent_popups(self)
             self.click(35, 405)  # Use inherited click
 
-        self.logger.change_status("Timeout waiting for Clash main menu - retrying...")
+        if _attempt < max_attempts:
+            self.logger.change_status(
+                f"Timeout waiting for Clash main menu (attempt {_attempt}/{max_attempts}). Retrying..."
+            )
+            return self.restart(_attempt=_attempt + 1)
+
+        self.logger.change_status("Timeout waiting for Clash main menu - all attempts exhausted.")
         return False
 
     # click() is now inherited from AdbBasedController
