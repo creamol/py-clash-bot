@@ -9,6 +9,7 @@ import psutil
 
 from pyclashbot.bot.nav import check_if_on_clash_main_menu
 from pyclashbot.emulators.adb_base import AdbBasedController
+from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE
 from pyclashbot.utils.cancellation import interruptible_sleep
 from pyclashbot.utils.platform import Platform
 
@@ -18,8 +19,9 @@ DEBUG = False
 class GooglePlayEmulatorController(AdbBasedController):
     supported_platforms = [Platform.WINDOWS]
 
-    def __init__(self, logger, render_settings: dict = {}):
+    def __init__(self, logger, render_settings: dict = {}, clash_package: str = GLOBAL_CLASH_PACKAGE):
         self.logger = logger
+        self.clash_package = clash_package
         # clear existing stuff
         self.stop()
         while self._is_emulator_running():
@@ -402,9 +404,9 @@ class GooglePlayEmulatorController(AdbBasedController):
             return False
 
         # boot clash
-        self.logger.change_status("Launching Clash Royale application...")
+        self.logger.change_status(f"Launching Clash Royale ({self.clash_package})...")
         interruptible_sleep(10)
-        clash_royale_name = "com.supercell.clashroyale"
+        clash_royale_name = self.clash_package
         start_app_count = 3
         for i in range(start_app_count):
             self.logger.change_status(f"Starting Clash Royale (attempt {i + 1}/{start_app_count})...")

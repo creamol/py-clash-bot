@@ -105,6 +105,9 @@ def make_job_dictionary(values: dict[str, Any]) -> dict[str, Any]:
 
     job_dictionary[UIField.ADB_SERIAL.value] = values.get(UIField.ADB_SERIAL.value)
 
+    # Game version selection (Chinese Tencent edition vs Global)
+    job_dictionary[UIField.CHINESE_GAME_TOGGLE.value] = as_bool(UIField.CHINESE_GAME_TOGGLE)
+
     return job_dictionary
 
 

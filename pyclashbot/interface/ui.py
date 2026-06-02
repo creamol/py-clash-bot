@@ -55,6 +55,7 @@ class PyClashBotUI(ttk.Window):
             current_theme = self.DEFAULT_THEME
         self.theme_var = ttk.StringVar(value=current_theme)
         self.discord_rpc_var = ttk.BooleanVar(value=False)
+        self.chinese_game_var = ttk.BooleanVar(value=False)
         self.advanced_settings_var = ttk.BooleanVar(value=False)
         self._config_callback: Callable[[dict[str, object]], None] | None = None
         self._open_logs_callback: Callable[[], None] | None = None
@@ -107,6 +108,7 @@ class PyClashBotUI(ttk.Window):
 
         values[UIField.THEME_NAME.value] = self.theme_var.get() or self.DEFAULT_THEME
         values[UIField.DISCORD_RPC_TOGGLE.value] = bool(self.discord_rpc_var.get())
+        values[UIField.CHINESE_GAME_TOGGLE.value] = bool(self.chinese_game_var.get())
         return values
 
     def set_all_values(self, values: dict[str, object]) -> None:
@@ -180,6 +182,9 @@ class PyClashBotUI(ttk.Window):
 
         if UIField.DISCORD_RPC_TOGGLE.value in values:
             self.discord_rpc_var.set(bool(values[UIField.DISCORD_RPC_TOGGLE.value]))
+
+        if UIField.CHINESE_GAME_TOGGLE.value in values:
+            self.chinese_game_var.set(bool(values[UIField.CHINESE_GAME_TOGGLE.value]))
 
         self._show_current_emulator_settings()
 
@@ -741,6 +746,28 @@ class PyClashBotUI(ttk.Window):
         discord_checkbox.pack(anchor="w", pady=(0, 6))
         self._trace_variable(self.discord_rpc_var)
         self._register_config_widget(UIField.DISCORD_RPC_TOGGLE.value, discord_checkbox)
+
+        ttk.Separator(data_frame, orient="horizontal").pack(fill="x", pady=(4, 6))
+        game_frame = ttk.Labelframe(self.misc_tab, text="Game Version", padding=10)
+        game_frame.pack(fill="x", padx=10, pady=(0, 10))
+
+        chinese_checkbox = ttk.Checkbutton(
+            game_frame,
+            text="🇨🇳 Chinese version (com.tencent.tmgp.supercell.clashroyale)",
+            variable=self.chinese_game_var,
+            bootstyle="round-toggle",
+            command=self._notify_config_change,
+        )
+        chinese_checkbox.pack(anchor="w", pady=(0, 4))
+        self._trace_variable(self.chinese_game_var)
+        self._register_config_widget(UIField.CHINESE_GAME_TOGGLE.value, chinese_checkbox)
+
+        ttk.Label(
+            game_frame,
+            text="Enable if you are using the Chinese (Tencent) edition of Clash Royale.",
+            foreground="gray",
+            wraplength=380,
+        ).pack(anchor="w")
 
         self.open_logs_btn = ttk.Button(
             data_frame,

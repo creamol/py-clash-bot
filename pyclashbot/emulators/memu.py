@@ -15,7 +15,7 @@ import psutil
 from pymemuc import PyMemuc, PyMemucError, VMInfo
 
 from pyclashbot.bot.nav import check_if_on_clash_main_menu
-from pyclashbot.emulators.base import BaseEmulatorController
+from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE, BaseEmulatorController
 from pyclashbot.utils.cancellation import interruptible_sleep
 from pyclashbot.utils.platform import Platform
 
@@ -139,13 +139,14 @@ def verify_memu_installation():
 class MemuEmulatorController(BaseEmulatorController):
     supported_platforms = [Platform.WINDOWS]
 
-    def __init__(self, logger, render_mode: str = "directx", debug_mode=False):
+    def __init__(self, logger, render_mode: str = "directx", debug_mode=False, clash_package: str = GLOBAL_CLASH_PACKAGE):
         """
         Initializes the MemuEmulatorController with a reference to PyMemuc and the selected VM index.
         Ensures only one VM with the given name exists.
         """
         self.logger = logger
         self.debug_mode = debug_mode
+        self.clash_package = clash_package
         init_start_time = time.time()
         self.pmc = PyMemuc()
 
@@ -1251,14 +1252,14 @@ class MemuEmulatorController(BaseEmulatorController):
                 self.logger.log("[RESTART] =====================================================")
                 self.logger.log("[RESTART] open_clash is True, proceeding with Clash Royale startup")
 
-            self.logger.change_status("Starting Clash Royale...")
+            self.logger.change_status(f"Starting Clash Royale ({self.clash_package})...")
             if debug_restart:
                 self.logger.log("[RESTART] Logger status updated to: 'Starting Clash Royale...'")
-                self.logger.log("[RESTART] About to call self.start_app('com.supercell.clashroyale')")
+                self.logger.log(f"[RESTART] About to call self.start_app('{self.clash_package}')")
 
             clash_start_time = time.time()
             try:
-                app_start_result = self.start_app("com.supercell.clashroyale")
+                app_start_result = self.start_app(self.clash_package)
                 clash_start_end = time.time()
 
                 if debug_clash:
@@ -1512,7 +1513,7 @@ class MemuEmulatorController(BaseEmulatorController):
         self.logger.change_status("Checking for Clash Royale installation...")
 
         # Check if app is now installed
-        package_name = getattr(self, "current_package_name", "com.supercell.clashroyale")
+        package_name = getattr(self, "current_package_name", self.clash_package)
         installed_apps = self.pmc.get_app_info_list_vm(vm_index=self.vm_index)
         found = [app for app in installed_apps if package_name in app]
 

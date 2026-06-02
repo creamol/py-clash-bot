@@ -4,6 +4,8 @@ from typing import Any
 
 from pyclashbot.bot.states import StateHistory, StateOrder, state_tree
 from pyclashbot.emulators import EmulatorType, get_emulator_registry
+from pyclashbot.emulators.base import CHINESE_CLASH_PACKAGE, GLOBAL_CLASH_PACKAGE
+from pyclashbot.interface.enums import UIField
 from pyclashbot.utils.cancellation import CancellationToken
 from pyclashbot.utils.logger import ProcessLogger
 from pyclashbot.utils.platform import is_macos
@@ -39,10 +41,18 @@ class WorkerProcess(Process):
 
         controller_class = registry[emulator_selection]
 
+        # Determine which Clash Royale package to launch
+        use_chinese = bool(jobs.get(UIField.CHINESE_GAME_TOGGLE.value, False))
+        clash_package = CHINESE_CLASH_PACKAGE if use_chinese else GLOBAL_CLASH_PACKAGE
+        if use_chinese:
+            logger.log(f"[Game Version] Chinese edition selected — using package: {clash_package}")
+        else:
+            logger.log(f"[Game Version] Global edition selected — using package: {clash_package}")
+
         try:
             if emulator_selection == EmulatorType.GOOGLE_PLAY:
                 print("Creating Google Play emulator")
-                return controller_class(logger=logger)
+                return controller_class(logger=logger, clash_package=clash_package)
 
             elif emulator_selection == EmulatorType.BLUESTACKS:
                 print("Creating BlueStacks 5 emulator")
@@ -50,7 +60,7 @@ class WorkerProcess(Process):
                 default_mode = "vlcn" if is_macos() else "gl"
                 bs_mode = jobs.get("bluestacks_render_mode", default_mode)
                 render_settings = {"graphics_renderer": bs_mode}
-                return controller_class(logger=logger, render_settings=render_settings)
+                return controller_class(logger=logger, render_settings=render_settings, clash_package=clash_package)
 
             elif emulator_selection == EmulatorType.MEMU:
                 print("Creating MEmu emulator")
@@ -60,12 +70,12 @@ class WorkerProcess(Process):
                     logger.change_status("MEmu is not installed! Please install it to use MEmu Emulator Mode")
                     return None
                 render_mode = jobs.get("memu_render_mode", "opengl")
-                return controller_class(logger, render_mode)
+                return controller_class(logger, render_mode, clash_package=clash_package)
 
             elif emulator_selection == EmulatorType.ADB:
                 print("Creating ADB Device controller")
                 adb_serial = jobs.get("adb_serial", None)
-                return controller_class(logger=logger, device_serial=adb_serial)
+                return controller_class(logger=logger, device_serial=adb_serial, clash_package=clash_package)
 
         except Exception as e:
             print(f"Failed to create {emulator_selection} emulator: {e}")

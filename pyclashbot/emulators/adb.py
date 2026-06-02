@@ -6,6 +6,7 @@ import time
 # Assuming these are in the correct path
 from pyclashbot.bot.nav import check_if_on_clash_main_menu
 from pyclashbot.emulators.adb_base import AdbBasedController
+from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE
 from pyclashbot.utils.cancellation import interruptible_sleep
 from pyclashbot.utils.platform import Platform, is_linux
 
@@ -24,7 +25,7 @@ class AdbController(AdbBasedController):
 
     supported_platforms = [Platform.WINDOWS, Platform.MACOS, Platform.LINUX]
 
-    def __init__(self, logger, device_serial: str | None = None):
+    def __init__(self, logger, device_serial: str | None = None, clash_package: str = GLOBAL_CLASH_PACKAGE):
         """
         Initializes the controller and connects to the adb device.
         Args:
@@ -35,6 +36,7 @@ class AdbController(AdbBasedController):
         """
         self.logger = logger
         self.device_serial = device_serial
+        self.clash_package = clash_package
         self._auto_stop_on_del = False  # No process to stop
 
         # For storing original screen settings
@@ -353,7 +355,7 @@ class AdbController(AdbBasedController):
         start_ts = time.time()
         self.logger.change_status("Restarting Clash Royale on device...")
 
-        clash_pkg = "com.supercell.clashroyale"
+        clash_pkg = self.clash_package
 
         # 1. Force stop the app
         self.logger.change_status(f"Force-stopping {clash_pkg}...")

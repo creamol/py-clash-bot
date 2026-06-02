@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import cv2
 import numpy as np
 
-from pyclashbot.emulators.base import BaseEmulatorController
+from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE, BaseEmulatorController
 from pyclashbot.utils.cancellation import interruptible_sleep
 
 
@@ -144,7 +144,7 @@ class AdbBasedController(BaseEmulatorController, ABC):
         """
         self.logger.change_status("Checking for app installation...")
 
-        package_name = getattr(self, "current_package_name", "com.supercell.clashroyale")
+        package_name = getattr(self, "current_package_name", getattr(self, "clash_package", GLOBAL_CLASH_PACKAGE))
 
         if self._check_app_installed(package_name):
             self.installation_waiting = False

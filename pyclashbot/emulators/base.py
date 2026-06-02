@@ -2,6 +2,10 @@ import numpy as np
 
 from pyclashbot.utils.platform import CURRENT_PLATFORM, Platform
 
+# Clash Royale package names
+GLOBAL_CLASH_PACKAGE = "com.supercell.clashroyale"
+CHINESE_CLASH_PACKAGE = "com.tencent.tmgp.supercell.clashroyale"
+
 
 class BaseEmulatorController:
     """

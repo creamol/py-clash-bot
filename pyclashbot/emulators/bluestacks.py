@@ -10,6 +10,7 @@ from os.path import normpath
 
 from pyclashbot.bot.nav import check_if_on_clash_main_menu
 from pyclashbot.emulators.adb_base import AdbBasedController
+from pyclashbot.emulators.base import GLOBAL_CLASH_PACKAGE
 from pyclashbot.utils.cancellation import interruptible_sleep
 from pyclashbot.utils.platform import Platform, is_macos
 
@@ -26,8 +27,9 @@ class BlueStacksEmulatorController(AdbBasedController):
 
     supported_platforms = [Platform.WINDOWS, Platform.MACOS]
 
-    def __init__(self, logger, render_settings: dict | None = None):
+    def __init__(self, logger, render_settings: dict | None = None, clash_package: str = GLOBAL_CLASH_PACKAGE):
         self.logger = logger
+        self.clash_package = clash_package
         self.expected_dims = (419, 633)  # Bypassing bs5's stupid dim limits
 
         self.instance_name = "pyclashbot-136"
@@ -668,8 +670,8 @@ class BlueStacksEmulatorController(AdbBasedController):
             interruptible_sleep(1)
 
         # Launch Clash Royale
-        clash_pkg = "com.supercell.clashroyale"
-        self.logger.change_status("Launching Clash Royale...")
+        clash_pkg = self.clash_package
+        self.logger.change_status(f"Launching Clash Royale ({clash_pkg})...")
 
         # Use inherited start_app which handles installation check
         if not self.start_app(clash_pkg):
