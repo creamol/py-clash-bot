@@ -325,21 +325,6 @@ def check_if_on_clash_main_menu(emulator) -> bool:
     return False
 
 
-def _print_card_page_debug_pixels(emulator):
-    """Print BGR pixel values at card page detection positions for diagnosing version color mismatches."""
-    try:
-        iar = emulator.screenshot()
-        if iar is None:
-            return
-        positions = [(433, 58), (116, 59), (58, 82), (64, 179), (62, 108), (67, 146), (77, 185), (77, 84)]
-        print("[card_page debug] BGR pixel values at detection positions:")
-        for y, x in positions:
-            pixel = iar[y][x].tolist()
-            print(f"  iar[{y}][{x}] = {pixel}")
-    except Exception as exc:
-        print(f"[card_page debug] Failed to capture debug pixels: {exc}")
-
-
 def get_to_card_page_from_clash_main(
     emulator,
     logger: Logger,
@@ -349,26 +334,16 @@ def get_to_card_page_from_clash_main(
 
     logger.change_status(status="Getting to card page from clash main")
 
-    # click card page icon
     emulator.click(
         CARD_PAGE_ICON_FROM_CLASH_MAIN[0],
         CARD_PAGE_ICON_FROM_CLASH_MAIN[1],
     )
     interruptible_sleep(2.5)
 
-    # while not on the card page, cycle the card page
-    first_fail = True
     while not check_if_on_card_page(emulator):
-        time_taken = time.time() - start_time
-        if time_taken > 30:
+        if time.time() - start_time > 30:
             return "restart"
 
-        # on first detection failure for Chinese, print pixels immediately
-        if is_chinese and first_fail:
-            _print_card_page_debug_pixels(emulator)
-            first_fail = False
-
-        # dismiss any Tencent (Chinese edition) UI overlays that may block navigation
         if is_chinese and handle_tencent_popups(emulator):
             interruptible_sleep(1)
             continue
@@ -727,19 +702,12 @@ def check_if_battle_mode_is_selected(emulator, mode: str):
 
     look_folder = mode2folder[mode]
 
-    print(f"[DEBUG] Checking if {mode} is selected...")
-    print(f"[DEBUG] Looking in folder: {look_folder}")
-    print("[DEBUG] Subcrop: (270, 455, 350, 533)")
-
-    # find image on screen
     coord = find_image(
         emulator.screenshot(),
         look_folder,
         tolerance=0.9,
         subcrop=(270, 455, 350, 533),
     )
-
-    print(f"[DEBUG] Found at: {coord}")
 
     return coord is not None
 
