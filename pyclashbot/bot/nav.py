@@ -3,6 +3,7 @@ import time
 from typing import Literal
 
 from pyclashbot.bot.constants import CLASH_MAIN_DEADSPACE_COORD as CLASH_MAIN_MENU_DEADSPACE_COORD
+from pyclashbot.bot.tencent_nav import handle_tencent_popups
 from pyclashbot.detection.image_rec import (
     all_pixels_are_equal,
     find_image,
@@ -222,6 +223,11 @@ def wait_for_clash_main_menu(emulator, logger: Logger, deadspace_click=True) -> 
         if time.time() - start_time > CLASH_MAIN_WAIT_TIMEOUT:
             logger.change_status("Timed out waiting for clash main")
             break
+
+        # dismiss any Tencent (Chinese edition) UI overlays first
+        if handle_tencent_popups(emulator):
+            interruptible_sleep(1)
+            continue
 
         # handle geting stuck on trophy road screen
         if check_for_trophy_reward_menu(emulator):
@@ -966,6 +972,11 @@ def get_to_main_after_fight(emulator, logger):
             print("Found trophy reward menu!\nHandling Trophy Reward Menu")
             handle_trophy_reward_menu(emulator, logger, printmode=False)
             interruptible_sleep(3)
+            continue
+
+        # dismiss any Tencent (Chinese edition) UI overlays
+        if handle_tencent_popups(emulator):
+            interruptible_sleep(1)
             continue
 
         if not clicked_ok_or_exit:
