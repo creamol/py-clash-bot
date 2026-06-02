@@ -4,6 +4,7 @@ from typing import Literal
 
 from pyclashbot.bot.constants import CLASH_MAIN_DEADSPACE_COORD as CLASH_MAIN_MENU_DEADSPACE_COORD
 from pyclashbot.bot.tencent_nav import handle_tencent_popups
+from pyclashbot.emulators.base import CHINESE_CLASH_PACKAGE
 from pyclashbot.detection.image_rec import (
     all_pixels_are_equal,
     find_image,
@@ -949,10 +950,24 @@ def find_post_battle_button(emulator):
     return None
 
 
+
+# Coordinates where the 确定 (OK) button appears on various Chinese CR post-battle screens.
+# Primary coord derived from screenshot: button sits at ~93% of screen height → y ≈ 588.
+# Ordered by most-common first; the loop tries each in turn.
+_CHINESE_POST_BATTLE_OK_COORDS = [
+    (210, 588),  # post-battle result screen (screenshot-verified)
+    (210, 600),  # slight lower variant
+    (210, 575),  # slight higher variant
+    (210, 545),  # other dialog positions
+]
+
+
 def get_to_main_after_fight(emulator, logger):
     timeout = 120  # s
     start_time = time.time()
     clicked_ok_or_exit = False
+    failed_detection_streak = 0
+    is_chinese = getattr(emulator, "clash_package", None) == CHINESE_CLASH_PACKAGE
 
     logger.change_status("Returning to clash main after the fight...")
 
@@ -972,20 +987,35 @@ def get_to_main_after_fight(emulator, logger):
             print("Found trophy reward menu!\nHandling Trophy Reward Menu")
             handle_trophy_reward_menu(emulator, logger, printmode=False)
             interruptible_sleep(3)
+            failed_detection_streak = 0
             continue
 
         # dismiss any Tencent (Chinese edition) UI overlays
         if handle_tencent_popups(emulator):
             interruptible_sleep(1)
+            failed_detection_streak = 0
             continue
 
-        if not clicked_ok_or_exit:
-            button_coord = find_post_battle_button(emulator)
-            if button_coord is not None:
-                print("Found post-battle button, clicking it.")
-                emulator.click(button_coord[0], button_coord[1])
-                clicked_ok_or_exit = True
-                continue
+        button_coord = find_post_battle_button(emulator)
+        if button_coord is not None and not clicked_ok_or_exit:
+            print("Found post-battle button, clicking it.")
+            emulator.click(button_coord[0], button_coord[1])
+            clicked_ok_or_exit = True
+            failed_detection_streak = 0
+            continue
+
+        failed_detection_streak += 1
+
+        # For Chinese package, after a few failed detection rounds try clicking at
+        # known 确定 button positions directly (template matching may not cover every
+        # post-battle screen variant).
+        if is_chinese and failed_detection_streak % 4 == 0:
+            coord_index = (failed_detection_streak // 4 - 1) % len(_CHINESE_POST_BATTLE_OK_COORDS)
+            fallback_coord = _CHINESE_POST_BATTLE_OK_COORDS[coord_index]
+            print(f"[Chinese fallback] Trying 确定 at {fallback_coord}")
+            emulator.click(fallback_coord[0], fallback_coord[1])
+            interruptible_sleep(1)
+            continue
 
         interruptible_sleep(1)
         print("Clicking on deadspace to close potential pop-up windows.")
